@@ -128,10 +128,13 @@ test:frontend:
 # Push Auth Service to Artifact Registry
 push:auth:
   stage: push
-  image: google/cloud-sdk:latest
+  image: docker:latest
   services:
     - docker:dind
   before_script:
+    - apk add --no-cache curl python3 py3-pip
+    - curl https://sdk.cloud.google.com | bash
+    - export PATH=$PATH:/root/google-cloud-sdk/bin
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
@@ -147,10 +150,13 @@ push:auth:
 # Push User Service to Artifact Registry
 push:user:
   stage: push
-  image: google/cloud-sdk:latest
+  image: docker:latest
   services:
     - docker:dind
   before_script:
+    - apk add --no-cache curl python3 py3-pip
+    - curl https://sdk.cloud.google.com | bash
+    - export PATH=$PATH:/root/google-cloud-sdk/bin
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
@@ -166,10 +172,13 @@ push:user:
 # Push Order Service to Artifact Registry
 push:order:
   stage: push
-  image: google/cloud-sdk:latest
+  image: docker:latest
   services:
     - docker:dind
   before_script:
+    - apk add --no-cache curl python3 py3-pip
+    - curl https://sdk.cloud.google.com | bash
+    - export PATH=$PATH:/root/google-cloud-sdk/bin
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
@@ -185,10 +194,13 @@ push:order:
 # Push Frontend to Artifact Registry
 push:frontend:
   stage: push
-  image: google/cloud-sdk:latest
+  image: docker:latest
   services:
     - docker:dind
   before_script:
+    - apk add --no-cache curl python3 py3-pip
+    - curl https://sdk.cloud.google.com | bash
+    - export PATH=$PATH:/root/google-cloud-sdk/bin
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
