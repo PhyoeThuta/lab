@@ -1,4 +1,5 @@
 stages:
+  - prepare
   - test
   - push
 
@@ -8,6 +9,56 @@ variables:
   ARTIFACT_REGISTRY: "asia-southeast1-docker.pkg.dev"
   REGISTRY_NAME: "lab"
   REGISTRY_URL: "${ARTIFACT_REGISTRY}/${GCP_PROJECT_ID}/${REGISTRY_NAME}"
+  DB_INSTANCE: "lab-postgres"
+  DB_NAME: "lab"
+  DB_USER: "postgres"
+  DB_PORT: "5432"
+  DB_REGION: "asia-southeast1"
+
+# ---------------------------------------------------
+# PREPARE STAGE - Database Setup
+# ---------------------------------------------------
+
+prepare:database:
+  stage: prepare
+  image: google/cloud-sdk:latest
+  before_script:
+    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --quiet
+    - gcloud config set project $GCP_PROJECT_ID --quiet
+  script:
+    # Check if instance exists, if not create it
+    - |
+      if gcloud sql instances describe $DB_INSTANCE --region=$DB_REGION > /dev/null 2>&1; then
+        echo "Cloud SQL instance already exists"
+      else
+        echo "Creating Cloud SQL instance..."
+        gcloud sql instances create $DB_INSTANCE \
+          --database-version=POSTGRES_15 \
+          --tier=db-f1-micro \
+          --region=$DB_REGION \
+          --quiet
+        echo "Waiting for instance to be ready..."
+        sleep 30
+      fi
+    # Get the public IP address
+    - DB_HOST=$(gcloud sql instances describe $DB_INSTANCE --region=$DB_REGION --format='value(ipAddresses[0].ipAddress)')
+    - echo "Database Host: $DB_HOST"
+    - echo "$DB_HOST" > /tmp/db_host.txt
+    # Create database if it doesn't exist
+    - gcloud sql databases create $DB_NAME --instance=$DB_INSTANCE --quiet || true
+    # Set root password
+    - gcloud sql users set-password postgres --instance=$DB_INSTANCE --password=$DB_PASSWORD --quiet || true
+    # Allow all connections to Cloud SQL (for now - restrict in production)
+    - gcloud sql instances patch $DB_INSTANCE --allowed-networks=0.0.0.0/0 --quiet || true
+  artifacts:
+    paths:
+      - /tmp/db_host.txt
+    reports:
+      dotenv: /tmp/db_host.txt
+  only:
+    - main
+  allow_failure: false
 
 # ---------------------------------------------------
 # TEST STAGE
