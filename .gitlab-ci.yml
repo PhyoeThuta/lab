@@ -1,8 +1,6 @@
 stages:
-  - build
   - test
   - push
-  - deploy
 
 variables:
   GCP_PROJECT_ID: "devops-lab-491207"
@@ -10,50 +8,6 @@ variables:
   ARTIFACT_REGISTRY: "asia-southeast1-docker.pkg.dev"
   REGISTRY_NAME: "lab"
   REGISTRY_URL: "${ARTIFACT_REGISTRY}/${GCP_PROJECT_ID}/${REGISTRY_NAME}"
-
-# ---------------------------------------------------
-# BUILD STAGE
-# ---------------------------------------------------
-
-build:auth:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - docker build -t auth-service:latest ./auth-service
-  only:
-    - main
-
-build:user:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - docker build -t user-service:latest ./user-service
-  only:
-    - main
-
-build:order:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - docker build -t order-service:latest ./order-service
-  only:
-    - main
-
-build:frontend:
-  stage: build
-  image: docker:latest
-  services:
-    - docker:dind
-  script:
-    - docker build -t frontend:latest ./frontend
-  only:
-    - main
 
 # ---------------------------------------------------
 # TEST STAGE
@@ -114,89 +68,93 @@ test:frontend:
     - main
 
 # ---------------------------------------------------
-# PUSH STAGE (FIXED & LONG VERSION)
+# PUSH STAGE - BUILD & PUSH DIRECTLY TO REGISTRY
 # ---------------------------------------------------
 
 push:auth:
   stage: push
-  image: gcr.io/cloud-builders/docker
+  image: docker:latest
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
-    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-    - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
+    - apk add --no-cache python3 py3-pip curl bash
+    - pip install --break-system-packages google-cloud-storage
+    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
+    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
+    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
+    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
+    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/auth-service:latest ./auth-service
     - docker push ${REGISTRY_URL}/auth-service:latest
-  dependencies:
-    - build:auth
   only:
     - main
 
 push:user:
   stage: push
-  image: gcr.io/cloud-builders/docker
+  image: docker:latest
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
-    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-    - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
+    - apk add --no-cache python3 py3-pip curl bash
+    - pip install --break-system-packages google-cloud-storage
+    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
+    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
+    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
+    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
+    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/user-service:latest ./user-service
     - docker push ${REGISTRY_URL}/user-service:latest
-  dependencies:
-    - build:user
   only:
     - main
 
 push:order:
   stage: push
-  image: gcr.io/cloud-builders/docker
+  image: docker:latest
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
-    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-    - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
+    - apk add --no-cache python3 py3-pip curl bash
+    - pip install --break-system-packages google-cloud-storage
+    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
+    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
+    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
+    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
+    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/order-service:latest ./order-service
     - docker push ${REGISTRY_URL}/order-service:latest
-  dependencies:
-    - build:order
   only:
     - main
 
 push:frontend:
   stage: push
-  image: gcr.io/cloud-builders/docker
+  image: docker:latest
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
-    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
-    - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
+    - apk add --no-cache python3 py3-pip curl bash
+    - pip install --break-system-packages google-cloud-storage
+    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
+    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
+    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
+    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
+    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/frontend:latest ./frontend
     - docker push ${REGISTRY_URL}/frontend:latest
-  dependencies:
-    - build:frontend
   only:
     - main
