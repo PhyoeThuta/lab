@@ -128,7 +128,7 @@ test:frontend:
 # Push Auth Service to Artifact Registry
 push:auth:
   stage: push
-  image: google/cloud-sdk:alpine
+  image: google/cloud-sdk:latest
   services:
     - docker:dind
   before_script:
@@ -147,7 +147,7 @@ push:auth:
 # Push User Service to Artifact Registry
 push:user:
   stage: push
-  image: google/cloud-sdk:alpine
+  image: google/cloud-sdk:latest
   services:
     - docker:dind
   before_script:
@@ -166,7 +166,7 @@ push:user:
 # Push Order Service to Artifact Registry
 push:order:
   stage: push
-  image: google/cloud-sdk:alpine
+  image: google/cloud-sdk:latest
   services:
     - docker:dind
   before_script:
@@ -185,7 +185,7 @@ push:order:
 # Push Frontend to Artifact Registry
 push:frontend:
   stage: push
-  image: google/cloud-sdk:alpine
+  image: google/cloud-sdk:latest
   services:
     - docker:dind
   before_script:
