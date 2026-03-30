@@ -222,6 +222,6 @@ deploy:frontend:
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --quiet
     - gcloud config set project $GCP_PROJECT_ID --quiet
   script:
-    - gcloud run deploy frontend --image=${REGISTRY_URL}/frontend:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --port=80 --quiet
+    - gcloud run deploy frontend --image=${REGISTRY_URL}/frontend:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --port=8080 --quiet
   only:
     - main
