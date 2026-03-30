@@ -33,7 +33,7 @@ prepare:database:
     - echo "Database Host:$DB_HOST" > /tmp/db_host.txt
     - gcloud sql databases create $DB_NAME --instance=$DB_INSTANCE --quiet 2>/dev/null || echo "Database already exists"
     - gcloud sql users set-password postgres --instance=$DB_INSTANCE --password=$DB_PASSWORD --quiet
-    - gcloud sql instances patch $DB_INSTANCE --allowed-networks=0.0.0.0/0 --quiet
+    - gcloud sql instances patch $DB_INSTANCE --authorized-networks=0.0.0.0/0 --quiet
   artifacts:
     paths:
       - /tmp/db_host.txt
