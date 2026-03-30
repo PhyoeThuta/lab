@@ -11,6 +11,11 @@ yarn.lock
 .env.local
 .env.*.local
 
+# GCP Service Account Keys (NEVER commit these!)
+*-gcp-key.json
+devops-lab-*.json
+*.json.backup
+
 # IDE & Editor
 .vscode/
 .idea/

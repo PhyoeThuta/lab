@@ -1,0 +1,203 @@
+stages:
+  - build
+  - test
+  - push
+  - deploy
+
+variables:
+  GCP_PROJECT_ID: "devops-lab-491207"
+  GCP_REGION: "asia-southeast1"
+  ARTIFACT_REGISTRY: "asia-southeast1-docker.pkg.dev"
+  REGISTRY_NAME: "lab"
+  REGISTRY_URL: "${ARTIFACT_REGISTRY}/${GCP_PROJECT_ID}/${REGISTRY_NAME}"
+
+# Build Auth Service
+build:auth:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t auth-service:latest ./auth-service
+  artifacts:
+    reports:
+      dotenv: build.env
+  only:
+    - main
+
+# Build User Service
+build:user:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t user-service:latest ./user-service
+  artifacts:
+    reports:
+      dotenv: build.env
+  only:
+    - main
+
+# Build Order Service
+build:order:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t order-service:latest ./order-service
+  artifacts:
+    reports:
+      dotenv: build.env
+  only:
+    - main
+
+# Build Frontend
+build:frontend:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t frontend:latest ./frontend
+  artifacts:
+    reports:
+      dotenv: build.env
+  only:
+    - main
+
+# Test Auth Service
+test:auth:
+  stage: test
+  image: node:18-alpine
+  before_script:
+    - cd auth-service
+    - npm install
+  script:
+    - npm run start &
+    - sleep 3
+    - curl -f http://localhost:3001/health || exit 1
+  allow_failure: true
+  only:
+    - main
+
+# Test User Service
+test:user:
+  stage: test
+  image: node:18-alpine
+  before_script:
+    - cd user-service
+    - npm install
+  script:
+    - npm run start &
+    - sleep 3
+    - curl -f http://localhost:3002/health || exit 1
+  allow_failure: true
+  only:
+    - main
+
+# Test Order Service
+test:order:
+  stage: test
+  image: node:18-alpine
+  before_script:
+    - cd order-service
+    - npm install
+  script:
+    - npm run start &
+    - sleep 3
+    - curl -f http://localhost:3003/health || exit 1
+  allow_failure: true
+  only:
+    - main
+
+# Test Frontend
+test:frontend:
+  stage: test
+  image: node:18-alpine
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npm run build
+  allow_failure: true
+  only:
+    - main
+
+# Push Auth Service to Artifact Registry
+push:auth:
+  stage: push
+  image: google/cloud-sdk:alpine
+  services:
+    - docker:dind
+  before_script:
+    - echo $GCP_SA_KEY | base64 -d > ${HOME}/gcp-key.json
+    - gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
+    - gcloud config set project $GCP_PROJECT_ID
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+  script:
+    - docker build -t ${REGISTRY_URL}/auth-service:latest ./auth-service
+    - docker push ${REGISTRY_URL}/auth-service:latest
+  dependencies:
+    - build:auth
+  only:
+    - main
+
+# Push User Service to Artifact Registry
+push:user:
+  stage: push
+  image: google/cloud-sdk:alpine
+  services:
+    - docker:dind
+  before_script:
+    - echo $GCP_SA_KEY | base64 -d > ${HOME}/gcp-key.json
+    - gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
+    - gcloud config set project $GCP_PROJECT_ID
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+  script:
+    - docker build -t ${REGISTRY_URL}/user-service:latest ./user-service
+    - docker push ${REGISTRY_URL}/user-service:latest
+  dependencies:
+    - build:user
+  only:
+    - main
+
+# Push Order Service to Artifact Registry
+push:order:
+  stage: push
+  image: google/cloud-sdk:alpine
+  services:
+    - docker:dind
+  before_script:
+    - echo $GCP_SA_KEY | base64 -d > ${HOME}/gcp-key.json
+    - gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
+    - gcloud config set project $GCP_PROJECT_ID
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+  script:
+    - docker build -t ${REGISTRY_URL}/order-service:latest ./order-service
+    - docker push ${REGISTRY_URL}/order-service:latest
+  dependencies:
+    - build:order
+  only:
+    - main
+
+# Push Frontend to Artifact Registry
+push:frontend:
+  stage: push
+  image: google/cloud-sdk:alpine
+  services:
+    - docker:dind
+  before_script:
+    - echo $GCP_SA_KEY | base64 -d > ${HOME}/gcp-key.json
+    - gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
+    - gcloud config set project $GCP_PROJECT_ID
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+  script:
+    - docker build -t ${REGISTRY_URL}/frontend:latest ./frontend
+    - docker push ${REGISTRY_URL}/frontend:latest
+  dependencies:
+    - build:frontend
+  only:
+    - main
+
