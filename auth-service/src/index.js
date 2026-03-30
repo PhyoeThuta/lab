@@ -7,6 +7,8 @@ require('dotenv').config({ override: true });
 
 const app = express();
 const port = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
 // Database connection
 const pool = new Pool({
@@ -108,8 +110,8 @@ app.post('/auth/login', async (req, res) => {
         username: user.username,
         role: user.role
       },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
     res.json({
@@ -137,7 +139,7 @@ app.post('/auth/validate', (req, res) => {
       return res.status(401).json({ valid: false, error: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     res.json({ 
       valid: true,
       user: decoded
