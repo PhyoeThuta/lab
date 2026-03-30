@@ -119,17 +119,13 @@ test:frontend:
 
 push:auth:
   stage: push
-  image: docker:latest
+  image: gcr.io/cloud-builders/docker
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache curl python3 py3-pip git
-    - curl https://sdk.cloud.google.com | bash > /dev/null 2>&1
-    - export PATH="/root/google-cloud-sdk/bin:$PATH"
-    - gcloud --version
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
@@ -144,17 +140,13 @@ push:auth:
 
 push:user:
   stage: push
-  image: docker:latest
+  image: gcr.io/cloud-builders/docker
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache curl python3 py3-pip git
-    - curl https://sdk.cloud.google.com | bash > /dev/null 2>&1
-    - export PATH="/root/google-cloud-sdk/bin:$PATH"
-    - gcloud --version
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
@@ -169,17 +161,13 @@ push:user:
 
 push:order:
   stage: push
-  image: docker:latest
+  image: gcr.io/cloud-builders/docker
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache curl python3 py3-pip git
-    - curl https://sdk.cloud.google.com | bash > /dev/null 2>&1
-    - export PATH="/root/google-cloud-sdk/bin:$PATH"
-    - gcloud --version
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
@@ -194,17 +182,13 @@ push:order:
 
 push:frontend:
   stage: push
-  image: docker:latest
+  image: gcr.io/cloud-builders/docker
   services:
     - docker:dind
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache curl python3 py3-pip git
-    - curl https://sdk.cloud.google.com | bash > /dev/null 2>&1
-    - export PATH="/root/google-cloud-sdk/bin:$PATH"
-    - gcloud --version
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
