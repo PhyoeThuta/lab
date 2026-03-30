@@ -23,12 +23,12 @@ function Login({ onLogin, apiBase }) {
 
     try {
       if (isRegister) {
-        await axios.post(`${apiBase}/auth/register`, formData);
+        await axios.post(`${apiBase}/auth/register/`, formData);
         setSuccess('Registration successful! Please login.');
         setIsRegister(false);
         setFormData({ username: '', email: '', password: '', role: 'user' });
       } else {
-        const response = await axios.post(`${apiBase}/auth/login`, {
+        const response = await axios.post(`${apiBase}/auth/login/`, {
           username: formData.username,
           password: formData.password
         });
