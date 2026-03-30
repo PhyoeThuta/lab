@@ -49,8 +49,6 @@ prepare:database:
   artifacts:
     paths:
       - /tmp/db_host.txt
-    reports:
-      dotenv: /tmp/db_host.txt
   only:
     - main
   allow_failure: false
