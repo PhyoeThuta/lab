@@ -114,7 +114,7 @@ test:frontend:
     - main
 
 # ---------------------------------------------------
-# PUSH STAGE (Corrected Image Tags)
+# PUSH STAGE (FIXED & LONG VERSION)
 # ---------------------------------------------------
 
 push:auth:
@@ -123,10 +123,11 @@ push:auth:
   services:
     - docker:dind
   before_script:
+    - apt-get update && apt-get install -y docker.io
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
   script:
     - docker build -t ${REGISTRY_URL}/auth-service:latest ./auth-service
     - docker push ${REGISTRY_URL}/auth-service:latest
@@ -141,10 +142,11 @@ push:user:
   services:
     - docker:dind
   before_script:
+    - apt-get update && apt-get install -y docker.io
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
   script:
     - docker build -t ${REGISTRY_URL}/user-service:latest ./user-service
     - docker push ${REGISTRY_URL}/user-service:latest
@@ -159,10 +161,11 @@ push:order:
   services:
     - docker:dind
   before_script:
+    - apt-get update && apt-get install -y docker.io
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
   script:
     - docker build -t ${REGISTRY_URL}/order-service:latest ./order-service
     - docker push ${REGISTRY_URL}/order-service:latest
@@ -177,10 +180,11 @@ push:frontend:
   services:
     - docker:dind
   before_script:
+    - apt-get update && apt-get install -y docker.io
     - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
     - gcloud config set project $GCP_PROJECT_ID
-    - gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - gcloud auth configure-docker ${ARTIFACT_REGISTRY} --quiet
   script:
     - docker build -t ${REGISTRY_URL}/frontend:latest ./frontend
     - docker push ${REGISTRY_URL}/frontend:latest
