@@ -30,13 +30,13 @@ prepare:database:
     - gcloud sql instances create $DB_INSTANCE --database-version=POSTGRES_15 --tier=db-f1-micro --region=$DB_REGION --quiet 2>/dev/null || echo "Instance already exists"
     - sleep 10
     - DB_HOST=$(gcloud sql instances describe $DB_INSTANCE --format='value(ipAddresses[0].ipAddress)')
-    - echo "Database Host:$DB_HOST" > /tmp/db_host.txt
+    - echo "Database Host:$DB_HOST" > db_host.txt
     - gcloud sql databases create $DB_NAME --instance=$DB_INSTANCE --quiet 2>/dev/null || echo "Database already exists"
     - gcloud sql users set-password postgres --instance=$DB_INSTANCE --password=$DB_PASSWORD --quiet
     - gcloud sql instances patch $DB_INSTANCE --authorized-networks=0.0.0.0/0 --quiet
   artifacts:
     paths:
-      - /tmp/db_host.txt
+      - db_host.txt
   only:
     - main
   allow_failure: false
