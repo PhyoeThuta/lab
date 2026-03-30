@@ -180,7 +180,10 @@ deploy:auth:
     - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --quiet
     - gcloud config set project $GCP_PROJECT_ID --quiet
   script:
-    - gcloud run deploy auth-service --image=${REGISTRY_URL}/auth-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --quiet
+    - DB_HOST=$(cat db_host.txt | sed 's/Database Host://g' | xargs)
+    - gcloud run deploy auth-service --image=${REGISTRY_URL}/auth-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --set-env-vars="DB_HOST=$DB_HOST,DB_PORT=$DB_PORT,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD" --quiet
+  needs:
+    - prepare:database
   only:
     - main
 
@@ -193,7 +196,7 @@ deploy:user:
     - gcloud config set project $GCP_PROJECT_ID --quiet
   script:
     - DB_HOST=$(cat db_host.txt | sed 's/Database Host://g' | xargs)
-    - gcloud run deploy user-service --image=${REGISTRY_URL}/user-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --set-env-vars="DB_HOST=$DB_HOST,DB_PORT=$DB_PORT,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,AUTH_SERVICE_URL=https://auth-service-<SERVICE_HASH>.run.app" --quiet
+    - gcloud run deploy user-service --image=${REGISTRY_URL}/user-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --set-env-vars="DB_HOST=$DB_HOST,DB_PORT=$DB_PORT,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,AUTH_SERVICE_URL=https://auth-service-akr3l4iuna-as.a.run.app" --quiet
   needs:
     - prepare:database
   only:
@@ -208,7 +211,7 @@ deploy:order:
     - gcloud config set project $GCP_PROJECT_ID --quiet
   script:
     - DB_HOST=$(cat db_host.txt | sed 's/Database Host://g' | xargs)
-    - gcloud run deploy order-service --image=${REGISTRY_URL}/order-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --set-env-vars="DB_HOST=$DB_HOST,DB_PORT=$DB_PORT,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,AUTH_SERVICE_URL=https://auth-service-<SERVICE_HASH>.run.app" --quiet
+    - gcloud run deploy order-service --image=${REGISTRY_URL}/order-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --set-env-vars="DB_HOST=$DB_HOST,DB_PORT=$DB_PORT,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,AUTH_SERVICE_URL=https://auth-service-akr3l4iuna-as.a.run.app" --quiet
   needs:
     - prepare:database
   only:
