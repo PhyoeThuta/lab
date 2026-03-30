@@ -15,7 +15,7 @@ function Dashboard({ token, user, onLogout, apiBase }) {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const response = await axios.get(`${apiBase}/orders/`, {
+      const response = await axios.get(`${apiBase}/orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setOrders(response.data.orders);
@@ -26,7 +26,7 @@ function Dashboard({ token, user, onLogout, apiBase }) {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await axios.get(`${apiBase}/users/`, {
+      const response = await axios.get(`${apiBase}/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(response.data.users);
@@ -49,7 +49,7 @@ function Dashboard({ token, user, onLogout, apiBase }) {
     setSuccess('');
 
     try {
-      await axios.post(`${apiBase}/orders/`, newOrder, {
+      await axios.post(`${apiBase}/orders`, newOrder, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Order created successfully!');
