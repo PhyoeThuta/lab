@@ -4,7 +4,7 @@ module.exports = function (app) {
   // Auth service routes
   app.use(
     createProxyMiddleware({
-      target: 'http://localhost:3001',
+      target: 'https://auth-service-331164391857.asia-southeast1.run.app',
       changeOrigin: true,
       pathFilter: (path) => path.startsWith('/auth'),
     })
@@ -13,7 +13,7 @@ module.exports = function (app) {
   // User service routes
   app.use(
     createProxyMiddleware({
-      target: 'http://localhost:3002',
+      target: 'https://user-service-331164391857.asia-southeast1.run.app',
       changeOrigin: true,
       pathFilter: (path) => path.startsWith('/users') || path.startsWith('/internal/users'),
     })
@@ -22,7 +22,7 @@ module.exports = function (app) {
   // Order service routes
   app.use(
     createProxyMiddleware({
-      target: 'http://localhost:3003',
+      target: 'https://order-service-331164391857.asia-southeast1.run.app',
       changeOrigin: true,
       pathFilter: (path) => path.startsWith('/orders') || path.startsWith('/admin/orders'),
     })
