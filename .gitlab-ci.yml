@@ -11,7 +11,10 @@ variables:
   REGISTRY_NAME: "lab"
   REGISTRY_URL: "${ARTIFACT_REGISTRY}/${GCP_PROJECT_ID}/${REGISTRY_NAME}"
 
-# Build Auth Service
+# ---------------------------------------------------
+# BUILD STAGE
+# ---------------------------------------------------
+
 build:auth:
   stage: build
   image: docker:latest
@@ -19,13 +22,9 @@ build:auth:
     - docker:dind
   script:
     - docker build -t auth-service:latest ./auth-service
-  artifacts:
-    reports:
-      dotenv: build.env
   only:
     - main
 
-# Build User Service
 build:user:
   stage: build
   image: docker:latest
@@ -33,13 +32,9 @@ build:user:
     - docker:dind
   script:
     - docker build -t user-service:latest ./user-service
-  artifacts:
-    reports:
-      dotenv: build.env
   only:
     - main
 
-# Build Order Service
 build:order:
   stage: build
   image: docker:latest
@@ -47,13 +42,9 @@ build:order:
     - docker:dind
   script:
     - docker build -t order-service:latest ./order-service
-  artifacts:
-    reports:
-      dotenv: build.env
   only:
     - main
 
-# Build Frontend
 build:frontend:
   stage: build
   image: docker:latest
@@ -61,13 +52,13 @@ build:frontend:
     - docker:dind
   script:
     - docker build -t frontend:latest ./frontend
-  artifacts:
-    reports:
-      dotenv: build.env
   only:
     - main
 
-# Test Auth Service
+# ---------------------------------------------------
+# TEST STAGE
+# ---------------------------------------------------
+
 test:auth:
   stage: test
   image: node:18-alpine
@@ -82,7 +73,6 @@ test:auth:
   only:
     - main
 
-# Test User Service
 test:user:
   stage: test
   image: node:18-alpine
@@ -97,7 +87,6 @@ test:user:
   only:
     - main
 
-# Test Order Service
 test:order:
   stage: test
   image: node:18-alpine
@@ -112,7 +101,6 @@ test:order:
   only:
     - main
 
-# Test Frontend
 test:frontend:
   stage: test
   image: node:18-alpine
@@ -125,10 +113,13 @@ test:frontend:
   only:
     - main
 
-# Push Auth Service to Artifact Registry
+# ---------------------------------------------------
+# PUSH STAGE (Corrected Image Tags)
+# ---------------------------------------------------
+
 push:auth:
   stage: push
-  image: google/cloud-sdk:debian-linux
+  image: google/cloud-sdk:slim
   services:
     - docker:dind
   before_script:
@@ -144,10 +135,9 @@ push:auth:
   only:
     - main
 
-# Push User Service to Artifact Registry
 push:user:
   stage: push
-  image: google/cloud-sdk:debian-linux
+  image: google/cloud-sdk:slim
   services:
     - docker:dind
   before_script:
@@ -163,10 +153,9 @@ push:user:
   only:
     - main
 
-# Push Order Service to Artifact Registry
 push:order:
   stage: push
-  image: google/cloud-sdk:debian-linux
+  image: google/cloud-sdk:slim
   services:
     - docker:dind
   before_script:
@@ -182,10 +171,9 @@ push:order:
   only:
     - main
 
-# Push Frontend to Artifact Registry
 push:frontend:
   stage: push
-  image: google/cloud-sdk:debian-linux
+  image: google/cloud-sdk:slim
   services:
     - docker:dind
   before_script:
@@ -200,4 +188,3 @@ push:frontend:
     - build:frontend
   only:
     - main
-
