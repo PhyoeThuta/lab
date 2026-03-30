@@ -80,13 +80,7 @@ push:auth:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache python3 py3-pip curl bash
-    - pip install --break-system-packages google-cloud-storage
-    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
-    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
-    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
-    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
-    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - echo "$GCP_SA_KEY" | docker login -u _json_key --password-stdin https://${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/auth-service:latest ./auth-service
     - docker push ${REGISTRY_URL}/auth-service:latest
@@ -102,13 +96,7 @@ push:user:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache python3 py3-pip curl bash
-    - pip install --break-system-packages google-cloud-storage
-    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
-    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
-    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
-    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
-    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - echo "$GCP_SA_KEY" | docker login -u _json_key --password-stdin https://${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/user-service:latest ./user-service
     - docker push ${REGISTRY_URL}/user-service:latest
@@ -124,13 +112,7 @@ push:order:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache python3 py3-pip curl bash
-    - pip install --break-system-packages google-cloud-storage
-    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
-    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
-    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
-    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
-    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - echo "$GCP_SA_KEY" | docker login -u _json_key --password-stdin https://${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/order-service:latest ./order-service
     - docker push ${REGISTRY_URL}/order-service:latest
@@ -146,13 +128,7 @@ push:frontend:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   before_script:
-    - apk add --no-cache python3 py3-pip curl bash
-    - pip install --break-system-packages google-cloud-storage
-    - curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-linux-x86_64.tar.gz
-    - tar xzf google-cloud-sdk-linux-x86_64.tar.gz -C /
-    - /google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=<(echo "$GCP_SA_KEY")
-    - /google-cloud-sdk/bin/gcloud config set project $GCP_PROJECT_ID
-    - /google-cloud-sdk/bin/gcloud auth configure-docker ${ARTIFACT_REGISTRY}
+    - echo "$GCP_SA_KEY" | docker login -u _json_key --password-stdin https://${ARTIFACT_REGISTRY}
   script:
     - docker build -t ${REGISTRY_URL}/frontend:latest ./frontend
     - docker push ${REGISTRY_URL}/frontend:latest
