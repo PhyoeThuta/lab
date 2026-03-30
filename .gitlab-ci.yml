@@ -2,6 +2,7 @@ stages:
   - prepare
   - test
   - push
+  - deploy
 
 variables:
   GCP_PROJECT_ID: "devops-lab-491207"
@@ -164,5 +165,63 @@ push:frontend:
   script:
     - docker build -t ${REGISTRY_URL}/frontend:latest ./frontend
     - docker push ${REGISTRY_URL}/frontend:latest
+  only:
+    - main
+
+# ---------------------------------------------------
+# DEPLOY STAGE - CLOUD RUN
+# ---------------------------------------------------
+
+deploy:auth:
+  stage: deploy
+  image: google/cloud-sdk:latest
+  before_script:
+    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --quiet
+    - gcloud config set project $GCP_PROJECT_ID --quiet
+  script:
+    - gcloud run deploy auth-service --image=${REGISTRY_URL}/auth-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --quiet
+  only:
+    - main
+
+deploy:user:
+  stage: deploy
+  image: google/cloud-sdk:latest
+  before_script:
+    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --quiet
+    - gcloud config set project $GCP_PROJECT_ID --quiet
+  script:
+    - DB_HOST=$(cat db_host.txt | sed 's/Database Host://g' | xargs)
+    - gcloud run deploy user-service --image=${REGISTRY_URL}/user-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --set-env-vars="DB_HOST=$DB_HOST,DB_PORT=$DB_PORT,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,AUTH_SERVICE_URL=https://auth-service-<SERVICE_HASH>.run.app" --quiet
+  needs:
+    - prepare:database
+  only:
+    - main
+
+deploy:order:
+  stage: deploy
+  image: google/cloud-sdk:latest
+  before_script:
+    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --quiet
+    - gcloud config set project $GCP_PROJECT_ID --quiet
+  script:
+    - DB_HOST=$(cat db_host.txt | sed 's/Database Host://g' | xargs)
+    - gcloud run deploy order-service --image=${REGISTRY_URL}/order-service:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --set-env-vars="DB_HOST=$DB_HOST,DB_PORT=$DB_PORT,DB_NAME=$DB_NAME,DB_USER=$DB_USER,DB_PASSWORD=$DB_PASSWORD,AUTH_SERVICE_URL=https://auth-service-<SERVICE_HASH>.run.app" --quiet
+  needs:
+    - prepare:database
+  only:
+    - main
+
+deploy:frontend:
+  stage: deploy
+  image: google/cloud-sdk:latest
+  before_script:
+    - echo "$GCP_SA_KEY" > /tmp/gcp-key.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --quiet
+    - gcloud config set project $GCP_PROJECT_ID --quiet
+  script:
+    - gcloud run deploy frontend --image=${REGISTRY_URL}/frontend:latest --region=$GCP_REGION --platform=managed --allow-unauthenticated --port=80 --quiet
   only:
     - main
