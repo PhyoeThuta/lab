@@ -31,7 +31,25 @@ spec:
       labels:
         app: order-service
     spec:
+      serviceAccountName: cloudsql-sa
       containers:
+      - name: cloud-sql-proxy
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.7.0
+        args:
+          - "--instances=$(CLOUDSQL_INSTANCE)=tcp:5432"
+          - "--use-http-health-check"
+        env:
+        - name: CLOUDSQL_INSTANCE
+          value: "devops-lab-491207:asia-southeast1:lab-postgres"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/secrets/cloud-sql/key.json"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+        volumeMounts:
+        - name: cloudsql-key
+          mountPath: /secrets/cloud-sql
+          readOnly: true
       - name: order-service
         image: asia-southeast1-docker.pkg.dev/devops-lab-491207/lab/order-service:latest
         imagePullPolicy: Always
@@ -41,10 +59,7 @@ spec:
         - name: PORT
           value: "3003"
         - name: DB_HOST
-          valueFrom:
-            secretKeyRef:
-              name: app-secrets
-              key: DB_HOST
+          value: "localhost"
         - name: DB_PORT
           valueFrom:
             configMapKeyRef:
@@ -94,3 +109,8 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+      volumes:
+      - name: cloudsql-key
+        secret:
+          secretName: cloudsql-sa-key
+          defaultMode: 0400

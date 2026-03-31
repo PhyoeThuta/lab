@@ -10,7 +10,11 @@ env:
   REGISTRY_NAME: "lab"
   GKE_CLUSTER: "lab-cluster"
   GKE_ZONE: "asia-southeast1-a"
+  GCP_REGION: "asia-southeast1"
   KUBE_NAMESPACE: "production"
+  CLOUDSQL_INSTANCE: "lab-postgres"
+  CLOUDSQL_DATABASE: "lab"
+  CLOUDSQL_USER: "postgres"
 
 jobs:
   create-gke-cluster:
@@ -59,6 +63,69 @@ jobs:
             --zone=${{ env.GKE_ZONE }} \
             --project=${{ env.GCP_PROJECT_ID }}
           echo "✓ Cluster credentials configured"
+
+  create-cloud-sql:
+    name: Create Cloud SQL Instance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Check if Cloud SQL instance exists
+        id: check-sql
+        run: |
+          if gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --quiet &>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✓ Cloud SQL instance already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "! Cloud SQL instance does not exist, will create it"
+          fi
+
+      - name: Create Cloud SQL instance (if not exists)
+        if: steps.check-sql.outputs.exists == 'false'
+        run: |
+          echo "Creating Cloud SQL instance: ${{ env.CLOUDSQL_INSTANCE }}..."
+          gcloud sql instances create ${{ env.CLOUDSQL_INSTANCE }} \
+            --database-version=POSTGRES_15 \
+            --tier=db-f1-micro \
+            --region=${{ env.GCP_REGION }} \
+            --availability-type=zonal \
+            --quiet
+          
+          # Wait for instance to be ready
+          sleep 30
+          
+          echo "✓ Cloud SQL instance created"
+
+      - name: Create database and user
+        run: |
+          # Create database
+          gcloud sql databases create ${{ env.CLOUDSQL_DATABASE }} \
+            --instance=${{ env.CLOUDSQL_INSTANCE }} \
+            --quiet 2>/dev/null || echo "Database already exists"
+          
+          # Set password for postgres user
+          gcloud sql users set-password ${{ env.CLOUDSQL_USER }} \
+            --instance=${{ env.CLOUDSQL_INSTANCE }} \
+            --password=${{ secrets.DB_PASSWORD }} \
+            --quiet
+          
+          echo "✓ Database and user configured"
+
+      - name: Get Cloud SQL Connection Name
+        id: sql-conn
+        run: |
+          CONN_NAME=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(connectionName)')
+          echo "connection_name=$CONN_NAME" >> $GITHUB_OUTPUT
+          echo "Connection Name: $CONN_NAME"
   setup-build-push:
     name: Setup, Build & Push Docker Images
     needs: create-gke-cluster
@@ -100,7 +167,7 @@ jobs:
 
   deploy-to-gke:
     name: Deploy to GKE
-    needs: [create-gke-cluster, setup-build-push]
+    needs: [create-gke-cluster, create-cloud-sql, setup-build-push]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -137,10 +204,19 @@ jobs:
 
       - name: Create/Update Secrets
         run: |
+          # Get Cloud SQL Connection Name
+          CONN_NAME=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(connectionName)')
+          
           kubectl create secret generic app-secrets \
-            --from-literal=DB_HOST=postgres.${{ env.KUBE_NAMESPACE }}.svc.cluster.local \
+            --from-literal=DB_HOST_CLOUDSQL=$CONN_NAME \
             --from-literal=DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
             --from-literal=JWT_SECRET=${{ secrets.JWT_SECRET }} \
+            --namespace=${{ env.KUBE_NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Create secret for Cloud SQL Auth (though Cloud SQL Proxy v2 uses Application Default Credentials)
+          kubectl create secret generic cloudsql-sa-key \
+            --from-literal=key.json="${{ secrets.GCP_SA_KEY }}" \
             --namespace=${{ env.KUBE_NAMESPACE }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
@@ -148,8 +224,8 @@ jobs:
         run: |
           kubectl create configmap app-config \
             --from-literal=DB_PORT=5432 \
-            --from-literal=DB_NAME=lab \
-            --from-literal=DB_USER=postgres \
+            --from-literal=DB_NAME=${{ env.CLOUDSQL_DATABASE }} \
+            --from-literal=DB_USER=${{ env.CLOUDSQL_USER }} \
             --from-literal=JWT_EXPIRES_IN=24h \
             --from-literal=AUTH_SERVICE_URL=http://auth-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3001 \
             --from-literal=USER_SERVICE_URL=http://user-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3002 \
@@ -157,20 +233,25 @@ jobs:
             --namespace=${{ env.KUBE_NAMESPACE }} \
             --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Initialize Cloud SQL Database
+        run: |
+          # Get Cloud SQL Connection Name
+          CONN_NAME=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(connectionName)')
+          
+          # Initialize database by running SQL script
+          echo "Initializing database from init-db.sql..."
+          
+          gcloud sql connect ${{ env.CLOUDSQL_INSTANCE }} \
+            --user=${{ env.CLOUDSQL_USER }} \
+            --database=${{ env.CLOUDSQL_DATABASE }} \
+            < init-db.sql || echo "Database initialization completed"
+          
+          echo "✓ Cloud SQL database initialized"
+
       - name: Apply Kubernetes manifests (Namespace)
         run: |
           kubectl apply -f k8s/namespace.yaml
-
-      - name: Apply Kubernetes manifests (PostgreSQL)
-        run: |
-          kubectl apply -f k8s/postgres.yaml
-
-      - name: Wait for PostgreSQL to be ready
-        run: |
-          kubectl wait --for=condition=ready pod \
-            -l app=postgres \
-            -n ${{ env.KUBE_NAMESPACE }} \
-            --timeout=300s || echo "PostgreSQL not ready yet"
+          kubectl apply -f k8s/serviceaccount.yaml
 
       - name: Apply Kubernetes manifests (Services)
         run: |
