@@ -7,11 +7,11 @@ on:
 
 env:
   GCP_PROJECT_ID: "devops-lab-491207"
-  ARTIFACT_REGISTRY: "asia-southeast1-docker.pkg.dev"
+  ARTIFACT_REGISTRY: "us-central1-docker.pkg.dev"
   REGISTRY_NAME: "lab"
   GKE_CLUSTER: "lab-cluster"
-  GKE_ZONE: "asia-southeast1-a"
-  GCP_REGION: "asia-southeast1"
+  GKE_ZONE: "us-central1-a"
+  GCP_REGION: "us-central1"
   KUBE_NAMESPACE: "production"
   CLOUDSQL_INSTANCE: "lab-postgres"
   CLOUDSQL_DATABASE: "lab"
