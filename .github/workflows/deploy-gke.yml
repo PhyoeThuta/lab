@@ -232,22 +232,88 @@ jobs:
     needs: [create-gke-cluster, create-cloud-sql, setup-build-push]
     runs-on: ubuntu-latest
     steps:
-      - name: Deployment summary
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install gke-gcloud-auth-plugin
         run: |
-          echo "=========================================="
-          echo "✓ GKE Cluster: lab-cluster"
-          echo "✓ Cloud SQL: lab-postgres"
-          echo "✓ Docker Images: Built and pushed to Artifact Registry"
-          echo "=========================================="
+          gcloud components install gke-gcloud-auth-plugin --quiet
+
+      - name: Get GKE cluster credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --zone=${{ env.GKE_ZONE }} \
+            --project=${{ env.GCP_PROJECT_ID }}
+          echo "✓ Cluster credentials obtained"
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Create namespace
+        run: |
+          kubectl create namespace ${{ env.KUBE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          echo "✓ Namespace created/verified"
+
+      - name: Create Secrets
+        run: |
+          CONN_NAME=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(connectionName)')
+          
+          kubectl create secret generic app-secrets \
+            --from-literal=DB_HOST_CLOUDSQL=$CONN_NAME \
+            --from-literal=DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            --from-literal=JWT_SECRET=${{ secrets.JWT_SECRET }} \
+            --namespace=${{ env.KUBE_NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "✓ Secrets created"
+
+      - name: Create ConfigMap
+        run: |
+          kubectl create configmap app-config \
+            --from-literal=DB_PORT=5432 \
+            --from-literal=DB_NAME=${{ env.CLOUDSQL_DATABASE }} \
+            --from-literal=DB_USER=${{ env.CLOUDSQL_USER }} \
+            --from-literal=JWT_EXPIRES_IN=24h \
+            --from-literal=AUTH_SERVICE_URL=http://auth-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3001 \
+            --from-literal=USER_SERVICE_URL=http://user-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3002 \
+            --from-literal=ORDER_SERVICE_URL=http://order-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3003 \
+            --namespace=${{ env.KUBE_NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "✓ ConfigMap created"
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/serviceaccount.yaml
+          kubectl apply -f k8s/auth-service.yaml
+          kubectl apply -f k8s/user-service.yaml
+          kubectl apply -f k8s/order-service.yaml
+          kubectl apply -f k8s/frontend.yaml
+          echo "✓ All manifests applied"
+
+      - name: Wait for deployments
+        run: |
+          kubectl rollout status deployment/auth-service -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/user-service -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/order-service -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/frontend -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          echo "✓ All deployments ready"
+
+      - name: Get service info
+        run: |
+          echo "=== Service Endpoints ==="
+          kubectl get svc -n ${{ env.KUBE_NAMESPACE }}
           echo ""
-          echo "Next steps:"
-          echo "1. Clone the repository locally"
-          echo "2. Authenticate: gcloud auth application-default login"
-          echo "3. Run: bash deploy.sh"
-          echo ""
-          echo "This will:"
-          echo "  - Get GKE cluster credentials"
-          echo "  - Create namespace and secrets"
-          echo "  - Deploy all services to Kubernetes"
-          echo "  - Display service endpoints"
-          echo "=========================================="
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.KUBE_NAMESPACE }}
