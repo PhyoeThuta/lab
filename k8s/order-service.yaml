@@ -40,7 +40,7 @@ spec:
           - "--use-http-health-check"
         env:
         - name: CLOUDSQL_INSTANCE
-          value: "devops-lab-491207:asia-southeast1:lab-postgres"
+          value: "devops-lab-491207:us-central1:lab-postgres"
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: "/secrets/cloud-sql/key.json"
         securityContext:
@@ -51,7 +51,7 @@ spec:
           mountPath: /secrets/cloud-sql
           readOnly: true
       - name: order-service
-        image: asia-southeast1-docker.pkg.dev/devops-lab-491207/lab/order-service:latest
+        image: us-central1-docker.pkg.dev/devops-lab-491207/lab/order-service:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 3003
@@ -104,11 +104,11 @@ spec:
           periodSeconds: 5
         resources:
           requests:
-            memory: "256Mi"
-            cpu: "250m"
+            memory: "128Mi"
+            cpu: "100m"
           limits:
-            memory: "512Mi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "200m"
       volumes:
       - name: cloudsql-key
         secret:

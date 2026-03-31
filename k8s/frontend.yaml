@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: asia-southeast1-docker.pkg.dev/devops-lab-491207/lab/frontend:latest
+        image: us-central1-docker.pkg.dev/devops-lab-491207/lab/frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
