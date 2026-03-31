@@ -56,10 +56,9 @@ jobs:
             --addons=HttpLoadBalancing \
             --workload-pool=${{ env.GCP_PROJECT_ID }}.svc.id.goog \
             --no-enable-basic-auth \
-            --enable-cloud-logging \
             --enable-ip-alias \
+            --enable-master-authorized-networks \
             --master-authorized-networks 0.0.0.0/0 \
-            --enable-network-policy \
             --quiet
           echo "✓ GKE cluster created successfully!"
 
