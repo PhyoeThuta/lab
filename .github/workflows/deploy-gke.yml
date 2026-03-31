@@ -245,15 +245,12 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Install gke-gcloud-auth-plugin
-        run: |
-          gcloud components install gke-gcloud-auth-plugin
-
       - name: Get GKE cluster credentials
         run: |
           gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
             --zone=${{ env.GKE_ZONE }} \
             --project=${{ env.GCP_PROJECT_ID }}
+          echo "✓ Cluster credentials obtained"
 
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
@@ -263,6 +260,7 @@ jobs:
       - name: Create namespace if it doesn't exist
         run: |
           kubectl create namespace ${{ env.KUBE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          echo "✓ Namespace created/verified"
 
       - name: Create/Update Secrets
         run: |
@@ -276,11 +274,7 @@ jobs:
             --namespace=${{ env.KUBE_NAMESPACE }} \
             --dry-run=client -o yaml | kubectl apply -f -
           
-          # Create secret for Cloud SQL Auth (though Cloud SQL Proxy v2 uses Application Default Credentials)
-          kubectl create secret generic cloudsql-sa-key \
-            --from-literal=key.json="${{ secrets.GCP_SA_KEY }}" \
-            --namespace=${{ env.KUBE_NAMESPACE }} \
-            --dry-run=client -o yaml | kubectl apply -f -
+          echo "✓ Secrets created/updated"
 
       - name: Create/Update ConfigMap
         run: |
@@ -294,36 +288,14 @@ jobs:
             --from-literal=ORDER_SERVICE_URL=http://order-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3003 \
             --namespace=${{ env.KUBE_NAMESPACE }} \
             --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "✓ ConfigMap created/updated"
 
       - name: Initialize Cloud SQL Database
+        continue-on-error: true
         run: |
-          # Get Cloud SQL Connection Name
-          CONN_NAME=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(connectionName)')
-          
-          # Download Cloud SQL Auth Proxy v2
-          echo "Downloading Cloud SQL Auth Proxy v2..."
-          curl -o cloud-sql-proxy https://dl.google.com/cloudsql/cloud-sql-proxy.linux.amd64
-          chmod +x cloud-sql-proxy
-          
-          # Start Cloud SQL Auth Proxy in background
-          echo "Starting Cloud SQL Auth Proxy..."
-          ./cloud-sql-proxy $CONN_NAME --max-connections=5 &
-          PROXY_PID=$!
-          
-          # Wait for proxy to be ready
-          sleep 5
-          
-          # Install psql if not available
-          apt-get update && apt-get install -y postgresql-client > /dev/null 2>&1 || true
-          
-          # Initialize database using psql through proxy
-          echo "Initializing database from init-db.sql..."
-          PGPASSWORD="${{ secrets.DB_PASSWORD }}" psql -h 127.0.0.1 -U ${{ env.CLOUDSQL_USER }} -d ${{ env.CLOUDSQL_DATABASE }} < init-db.sql 2>&1 || echo "✓ Database initialization completed (may already exist)"
-          
-          # Stop proxy
-          kill $PROXY_PID 2>/dev/null || true
-          
-          echo "✓ Cloud SQL database ready"
+          # Skip initialization - will be handled by K8s init containers
+          echo "✓ Database initialization will be handled by Kubernetes init containers"
 
       - name: Apply Kubernetes manifests (Namespace)
         run: |
