@@ -55,6 +55,11 @@ jobs:
             --enable-autoupgrade \
             --addons=HttpLoadBalancing \
             --workload-pool=${{ env.GCP_PROJECT_ID }}.svc.id.goog \
+            --no-enable-basic-auth \
+            --enable-cloud-logging \
+            --enable-ip-alias \
+            --master-authorized-networks 0.0.0.0/0 \
+            --enable-network-policy \
             --quiet
           echo "✓ GKE cluster created successfully!"
 
