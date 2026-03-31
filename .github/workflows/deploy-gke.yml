@@ -1,0 +1,198 @@
+name: Build & Deploy to GKE
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  GCP_PROJECT_ID: "devops-lab-491207"
+  ARTIFACT_REGISTRY: "asia-southeast1-docker.pkg.dev"
+  REGISTRY_NAME: "lab"
+  GKE_CLUSTER: "lab-cluster"
+  GKE_ZONE: "asia-southeast1-a"
+  KUBE_NAMESPACE: "production"
+
+jobs:
+  create-gke-cluster:
+    name: Create or Verify GKE Cluster
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Check if cluster exists
+        id: check-cluster
+        run: |
+          if gcloud container clusters describe ${{ env.GKE_CLUSTER }} --zone=${{ env.GKE_ZONE }} &>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✓ GKE cluster already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "! GKE cluster does not exist, will create it"
+          fi
+
+      - name: Create GKE cluster (if not exists)
+        if: steps.check-cluster.outputs.exists == 'false'
+        run: |
+          echo "Creating GKE cluster: ${{ env.GKE_CLUSTER }}..."
+          gcloud container clusters create ${{ env.GKE_CLUSTER }} \
+            --zone=${{ env.GKE_ZONE }} \
+            --num-nodes=1 \
+            --machine-type=e2-small \
+            --enable-autorepair \
+            --enable-autoupgrade \
+            --addons=HttpLoadBalancing \
+            --workload-pool=${{ env.GCP_PROJECT_ID }}.svc.id.goog \
+            --quiet
+          echo "✓ GKE cluster created successfully!"
+
+      - name: Get cluster credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --zone=${{ env.GKE_ZONE }} \
+            --project=${{ env.GCP_PROJECT_ID }}
+          echo "✓ Cluster credentials configured"
+  setup-build-push:
+    name: Setup, Build & Push Docker Images
+    needs: create-gke-cluster
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth-service, user-service, order-service, frontend]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker authentication for Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }} --quiet
+
+      - name: Build and push ${{ matrix.service }} Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./${{ matrix.service }}
+          push: true
+          tags: |
+            ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT_ID }}/${{ env.REGISTRY_NAME }}/${{ matrix.service }}:latest
+            ${{ env.ARTIFACT_REGISTRY }}/${{ env.GCP_PROJECT_ID }}/${{ env.REGISTRY_NAME }}/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-to-gke:
+    name: Deploy to GKE
+    needs: [create-gke-cluster, setup-build-push]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Install gke-gcloud-auth-plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin
+
+      - name: Get GKE cluster credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --zone=${{ env.GKE_ZONE }} \
+            --project=${{ env.GCP_PROJECT_ID }}
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Create namespace if it doesn't exist
+        run: |
+          kubectl create namespace ${{ env.KUBE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create/Update Secrets
+        run: |
+          kubectl create secret generic app-secrets \
+            --from-literal=DB_HOST=postgres.${{ env.KUBE_NAMESPACE }}.svc.cluster.local \
+            --from-literal=DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            --from-literal=JWT_SECRET=${{ secrets.JWT_SECRET }} \
+            --namespace=${{ env.KUBE_NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create/Update ConfigMap
+        run: |
+          kubectl create configmap app-config \
+            --from-literal=DB_PORT=5432 \
+            --from-literal=DB_NAME=lab \
+            --from-literal=DB_USER=postgres \
+            --from-literal=JWT_EXPIRES_IN=24h \
+            --from-literal=AUTH_SERVICE_URL=http://auth-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3001 \
+            --from-literal=USER_SERVICE_URL=http://user-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3002 \
+            --from-literal=ORDER_SERVICE_URL=http://order-service.${{ env.KUBE_NAMESPACE }}.svc.cluster.local:3003 \
+            --namespace=${{ env.KUBE_NAMESPACE }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply Kubernetes manifests (Namespace)
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+
+      - name: Apply Kubernetes manifests (PostgreSQL)
+        run: |
+          kubectl apply -f k8s/postgres.yaml
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          kubectl wait --for=condition=ready pod \
+            -l app=postgres \
+            -n ${{ env.KUBE_NAMESPACE }} \
+            --timeout=300s || echo "PostgreSQL not ready yet"
+
+      - name: Apply Kubernetes manifests (Services)
+        run: |
+          kubectl apply -f k8s/auth-service.yaml
+          kubectl apply -f k8s/user-service.yaml
+          kubectl apply -f k8s/order-service.yaml
+          kubectl apply -f k8s/frontend.yaml
+
+      - name: Verify deployments
+        run: |
+          kubectl rollout status deployment/auth-service -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/user-service -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/order-service -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+          kubectl rollout status deployment/frontend -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
+
+      - name: Get service endpoints
+        run: |
+          echo "=== Service Endpoints ==="
+          kubectl get svc -n ${{ env.KUBE_NAMESPACE }}
+          echo ""
+          echo "=== Deployments ==="
+          kubectl get deployments -n ${{ env.KUBE_NAMESPACE }}
+          echo ""
+          echo "=== Pods ==="
+          kubectl get pods -n ${{ env.KUBE_NAMESPACE }}
