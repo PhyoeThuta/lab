@@ -1,5 +1,6 @@
 name: Build & Deploy to GKE
 
+# Automated GKE deployment with Cloud SQL and Artifact Registry
 on:
   push:
     branches: [ main ]
