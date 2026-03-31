@@ -100,19 +100,49 @@ jobs:
             --availability-type=zonal \
             --quiet
           
-          # Wait for instance to be ready
-          sleep 30
+          echo "Waiting for instance to be ready (this may take 2-3 minutes)..."
+          gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(state)' > /tmp/instance_state.txt
           
-          echo "✓ Cloud SQL instance created"
+          # Wait for instance to be RUNNABLE
+          for i in {1..60}; do
+            STATE=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(state)')
+            echo "Instance state: $STATE (attempt $i/60)"
+            if [ "$STATE" = "RUNNABLE" ]; then
+              echo "✓ Cloud SQL instance is ready!"
+              break
+            fi
+            sleep 10
+          done
+          
+          # Final check
+          STATE=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(state)')
+          if [ "$STATE" != "RUNNABLE" ]; then
+            echo "⚠ Instance state is $STATE, but continuing..."
+          fi
 
       - name: Create database and user
         run: |
+          echo "Waiting for Cloud SQL instance to be fully ready..."
+          
+          # Wait for instance to be RUNNABLE before operations
+          for i in {1..60}; do
+            STATE=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(state)' 2>/dev/null || echo "UNKNOWN")
+            if [ "$STATE" = "RUNNABLE" ]; then
+              echo "✓ Instance is RUNNABLE"
+              break
+            fi
+            echo "Instance state: $STATE (attempt $i/60)"
+            sleep 10
+          done
+          
           # Create database
+          echo "Creating database..."
           gcloud sql databases create ${{ env.CLOUDSQL_DATABASE }} \
             --instance=${{ env.CLOUDSQL_INSTANCE }} \
             --quiet 2>/dev/null || echo "Database already exists"
           
           # Set password for postgres user
+          echo "Setting database password..."
           gcloud sql users set-password ${{ env.CLOUDSQL_USER }} \
             --instance=${{ env.CLOUDSQL_INSTANCE }} \
             --password=${{ secrets.DB_PASSWORD }} \
@@ -126,9 +156,40 @@ jobs:
           CONN_NAME=$(gcloud sql instances describe ${{ env.CLOUDSQL_INSTANCE }} --format='value(connectionName)')
           echo "connection_name=$CONN_NAME" >> $GITHUB_OUTPUT
           echo "Connection Name: $CONN_NAME"
+  setup-artifact-registry:
+    name: Setup Artifact Registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Create Artifact Registry repository (if not exists)
+        run: |
+          echo "Checking if Artifact Registry repository exists..."
+          if gcloud artifacts repositories describe ${{ env.REGISTRY_NAME }} \
+            --location=${{ env.GCP_REGION }} \
+            --project=${{ env.GCP_PROJECT_ID }} &>/dev/null; then
+            echo "✓ Artifact Registry repository already exists"
+          else
+            echo "Creating Artifact Registry repository..."
+            gcloud artifacts repositories create ${{ env.REGISTRY_NAME }} \
+              --repository-format=docker \
+              --location=${{ env.GCP_REGION }} \
+              --project=${{ env.GCP_PROJECT_ID }} \
+              --quiet
+            echo "✓ Artifact Registry repository created"
+          fi
+
   setup-build-push:
     name: Setup, Build & Push Docker Images
-    needs: create-gke-cluster
+    needs: [create-gke-cluster, setup-artifact-registry]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -136,9 +197,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v1
@@ -150,11 +208,14 @@ jobs:
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
       - name: Configure Docker authentication for Artifact Registry
         run: |
           gcloud auth configure-docker ${{ env.ARTIFACT_REGISTRY }} --quiet
 
-      - name: Build and push ${{ matrix.service }} Docker image
+      - name: Build and push ${{ matrix.service }}
         uses: docker/build-push-action@v4
         with:
           context: ./${{ matrix.service }}
